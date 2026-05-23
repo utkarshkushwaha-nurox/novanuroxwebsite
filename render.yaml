@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: nova-nurox
+    runtime: static
+    buildCommand: bun install && bun run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: true
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_SUPABASE_URL
+        value: https://cyeskvdockcojtremqqa.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5ZXNrdmRvY2tjb2p0cmVtcXFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTAwNTIsImV4cCI6MjA5MjUyNjA1Mn0.6RsXk0-OPnt_YF3skVv_hMi6nkmH4rfFdJccdDR5Ojo
