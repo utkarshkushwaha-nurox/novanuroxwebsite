@@ -7,6 +7,7 @@ import { Footer } from "@/components/Footer";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
 import { friendlyError } from "@/lib/friendlyError";
 
+// Zod schema for input form field constraint validation
 const Schema = z.object({
   full_name: z.string().trim().min(2, "Enter your full name").max(80),
   class_section: z.string().trim().min(1, "Enter your class & section").max(40),
@@ -42,8 +43,7 @@ export default function EnrollPage() {
         setLoadingSchools(false);
         return;
       }
-      // Use SECURITY DEFINER RPC so anonymous visitors only see school NAMES,
-      // not principal/contact/WhatsApp PII from school_partnerships.
+      // Security Definer RPC execution for safety masking
       const { data, error } = await supabase.rpc("list_partner_schools");
       if (cancelled) return;
       if (error) {
@@ -70,6 +70,7 @@ export default function EnrollPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError(null);
+
     const parsed = Schema.safeParse(form);
     if (!parsed.success) {
       const errs: Partial<Record<keyof FormData, string>> = {};
@@ -80,23 +81,33 @@ export default function EnrollPage() {
       setErrors(errs);
       return;
     }
+
     if (!supabaseConfigured) {
       setSubmitError("Backend not configured.");
       return;
     }
+
     const sel = schools.find((x) => x.school_name === parsed.data.school_name);
     if (sel && sel.student_capacity > 0 && sel.enrolled_count >= sel.student_capacity) {
       setSubmitError("This school's batch is already full. Please contact us on WhatsApp.");
       return;
     }
+
     setSubmitting(true);
-    const { error } = await supabase.from("student_enrollments").insert({
-      full_name: parsed.data.full_name,
-      class_section: parsed.data.class_section,
-      school_name: parsed.data.school_name,
-      parent_whatsapp: parsed.data.parent_whatsapp,
-    });
-    setSubmitting(false);
+
+    // Step 1: Create a pending record in Supabase
+    const { data: enrollmentData, error } = await supabase
+      .from("student_enrollments")
+      .insert({
+        full_name: parsed.data.full_name,
+        class_section: parsed.data.class_section,
+        school_name: parsed.data.school_name,
+        parent_whatsapp: parsed.data.parent_whatsapp,
+        paid: false,
+      })
+      .select()
+      .single();
+
     if (error) {
       if (typeof console !== "undefined") console.error("enroll submit", error);
       const msg = (error as { message?: string }).message ?? "";
@@ -105,10 +116,54 @@ export default function EnrollPage() {
       } else {
         setSubmitError(friendlyError(error, "Could not register. Please try again."));
       }
+      setSubmitting(false);
       return;
     }
-    setSuccess(true);
-    setForm({ full_name: "", class_section: "", school_name: "", parent_whatsapp: "" });
+
+    // Step 2: Open Razorpay Payment Window Gateway Frame natively
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID || "YOUR_PUBLIC_KEY_ID",
+      amount: 104 * 100, // Stored explicitly in lesser-denomination units (Paise)
+      currency: "INR",
+      name: "Nova Nurox",
+      description: `AI Intensive Bootcamp Registration - ${parsed.data.full_name}`,
+      prefill: {
+        name: parsed.data.full_name,
+        contact: parsed.data.parent_whatsapp,
+      },
+      handler: async function (response: any) {
+        // Fire database execution mutation changes upon success callback trap
+        const { error: patchError } = await supabase
+          .from("student_enrollments")
+          .update({
+            paid: true,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_signature: response.razorpay_signature,
+          })
+          .eq("id", enrollmentData.id);
+
+        setSubmitting(false);
+        if (!patchError) {
+          setSuccess(true);
+          setForm({ full_name: "", class_section: "", school_name: "", parent_whatsapp: "" });
+        } else {
+          setSubmitError("Payment captured, but structural update failed. Please text support.");
+        }
+      },
+      modal: {
+        ondismiss: function () {
+          setSubmitting(false);
+          setSubmitError("Payment screen was dismissed by the user before authorization.");
+        },
+      },
+      theme: {
+        color: "#00F0FF", // Custom high-contrast aesthetic cyan theme mapping
+      },
+    };
+
+    const rzp = new (window as any).Razorpay(options);
+    rzp.open();
   }
 
   return (
@@ -120,12 +175,11 @@ export default function EnrollPage() {
             <GraduationCap size={14} /> Student Registration
           </div>
           <h1 className="mt-5 font-display text-3xl sm:text-4xl font-bold leading-tight">
-            Join Your School&apos;s{" "}
-            <span className="text-gradient-neon">AI Bootcamp</span>
+            Join Your School&apos;s <span className="text-gradient-neon">AI Bootcamp</span>
           </h1>
           <p className="mt-4 text-sm text-muted-foreground">
-            Register for your school&apos;s 10-day Nova Nurox AI Bootcamp. Limited to 20
-            students per batch.
+            Register for your school&apos;s 12-day Nova Nurox AI Bootcamp. Limited to 20 students
+            per batch.
           </p>
 
           {success ? (
@@ -133,8 +187,8 @@ export default function EnrollPage() {
               <CheckCircle2 className="mx-auto text-primary" size={42} />
               <h2 className="mt-4 font-display text-2xl font-bold">Registration Received</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Your spot is reserved. We&apos;ll WhatsApp your parent within 24 hours to
-                confirm the batch and collect the ₹104 registration fee.
+                Your spot is confirmed! Your payment transaction record has been cleanly cataloged,
+                and your seats are reserved inside the intensive cluster.
               </p>
               <Link
                 to="/"
@@ -197,7 +251,8 @@ export default function EnrollPage() {
                     >
                       <option value="">Select your school…</option>
                       {schools.map((s) => {
-                        const full = s.enrolled_count >= s.student_capacity && s.student_capacity > 0;
+                        const full =
+                          s.enrolled_count >= s.student_capacity && s.student_capacity > 0;
                         return (
                           <option key={s.school_name} value={s.school_name} disabled={full}>
                             {s.school_name}
@@ -211,7 +266,8 @@ export default function EnrollPage() {
                     {(() => {
                       const sel = schools.find((x) => x.school_name === form.school_name);
                       if (!sel) return null;
-                      const full = sel.enrolled_count >= sel.student_capacity && sel.student_capacity > 0;
+                      const full =
+                        sel.enrolled_count >= sel.student_capacity && sel.student_capacity > 0;
                       return (
                         <p
                           className={`text-[11px] ${
@@ -255,9 +311,10 @@ export default function EnrollPage() {
               </div>
 
               <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-foreground/90">
-                <strong>Registration Fee: ₹104</strong> (Payable after batch confirmation)
+                <strong>Registration Fee: ₹104</strong> (Payable instantly via secure gateway popup)
                 <div className="text-[11px] text-muted-foreground mt-1">
-                  Total course fee ₹149 — your school covers ₹45 (30%); parents pay ₹104 (70%).
+                  Total course fee ₹149 — your school fund handles ₹45 (30%); parents process ₹104
+                  (70%).
                 </div>
               </div>
 
@@ -272,12 +329,8 @@ export default function EnrollPage() {
                 disabled={submitting}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-gradient-neon h-12 text-sm font-bold text-background shadow-neon hover:scale-[1.01] transition-smooth disabled:opacity-60"
               >
-                {submitting ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Rocket size={16} />
-                )}
-                Register for Batch
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : <Rocket size={16} />}
+                Pay & Register for Bootcamp
               </button>
             </form>
           )}

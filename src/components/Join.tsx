@@ -143,8 +143,7 @@ export function Join() {
                 <span className="text-destructive font-semibold">Batch Full</span>
               ) : (
                 <>
-                  Only{" "}
-                  <span className="text-primary font-semibold">{seatsLeft} seats left</span> in
+                  Only <span className="text-primary font-semibold">{seatsLeft} seats left</span> in
                   the Alpha Batch.
                 </>
               )}

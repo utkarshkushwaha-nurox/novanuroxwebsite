@@ -42,7 +42,7 @@ export function Founders() {
           }
         });
       },
-      { threshold: 0.2 }
+      { threshold: 0.2 },
     );
 
     const cards = sectionRef.current?.querySelectorAll("[data-idx]");
@@ -72,9 +72,7 @@ export function Founders() {
                 data-idx={idx}
                 style={{ transitionDelay: `${idx * 150}ms` }}
                 className={`rounded-2xl bg-gradient-card border border-border hover:border-primary/40 shadow-card overflow-hidden transition-all duration-700 ease-out hover:-translate-y-2 hover:shadow-[0_20px_60px_-15px_hsl(var(--primary)/0.4)] ${
-                  isVisible
-                    ? "opacity-100 translate-y-0"
-                    : "opacity-0 translate-y-12"
+                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
                 }`}
               >
                 <div className="relative aspect-[4/5] overflow-hidden bg-gradient-neon">
@@ -86,7 +84,9 @@ export function Founders() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-6">
-                    <h3 className="font-display text-2xl md:text-3xl font-bold drop-shadow-lg">{f.name}</h3>
+                    <h3 className="font-display text-2xl md:text-3xl font-bold drop-shadow-lg">
+                      {f.name}
+                    </h3>
                     <p className="text-sm text-primary font-medium">{f.role}</p>
                   </div>
                 </div>

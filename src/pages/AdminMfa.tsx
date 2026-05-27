@@ -240,8 +240,8 @@ export default function AdminMfa() {
           {mode === "challenge" && (
             <div className="mt-6">
               <p className="text-xs text-muted-foreground">
-                Open Google Authenticator on your phone and enter the 6-digit code
-                shown for <span className="text-foreground">Nova Nurox Admin</span>.
+                Open Google Authenticator on your phone and enter the 6-digit code shown for{" "}
+                <span className="text-foreground">Nova Nurox Admin</span>.
               </p>
               <VerifyForm
                 code={code}

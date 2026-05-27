@@ -12,8 +12,8 @@ export function Hero() {
           </div>
 
           <h1 className="mt-6 font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.05]">
-            Nova Nurox AI:{" "}
-            <span className="text-gradient-neon">The 10-Day AI Co-Pilot</span> Challenge
+            Nova Nurox AI: <span className="text-gradient-neon">The 10-Day AI Co-Pilot</span>{" "}
+            Challenge
           </h1>
 
           <p className="mt-6 text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
@@ -55,7 +55,6 @@ export function Hero() {
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </section>
